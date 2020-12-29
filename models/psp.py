@@ -76,7 +76,6 @@ class pSp(nn.Module):
 				else:
 					codes = codes + self.latent_avg.repeat(codes.shape[0], 1, 1)
 
-
 		if latent_mask is not None:
 			for i in latent_mask:
 				if inject_latent is not None:
@@ -87,7 +86,7 @@ class pSp(nn.Module):
 				else:
 					codes[:, i] = 0
 
-		input_is_latent = not input_code
+		input_is_latent = not input_code # True
 		images, result_latent = self.decoder([codes],
 		                                     input_is_latent=input_is_latent,
 		                                     randomize_noise=randomize_noise,

@@ -8,6 +8,8 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 import sys
+from pathlib import Path
+import pickle
 
 sys.path.append(".")
 sys.path.append("..")
@@ -47,6 +49,19 @@ def run():
 	net.eval()
 	net.cuda()
 
+	# To infer from W+ code run this code.
+
+	# x = np.load('experiments/cat_face-fork/inference_results/flickr_cat_000096.npy')
+	# x2 = torch.Tensor(x).cuda() # Shape should be 1x18x512
+	#
+	# net(x2, input_code=True)
+	# images, result_latent = net.decoder([x2],
+	# 									 input_is_latent=True,
+	# 									 randomize_noise=False,
+	# 									 return_latents=True)
+	#
+	# exit()
+
 	print('Loading dataset for {}'.format(opts.dataset_type))
 	dataset_args = data_configs.DATASETS[opts.dataset_type]
 	transforms_dict = dataset_args['transforms'](opts).get_transforms()
@@ -75,8 +90,18 @@ def run():
 			global_time.append(toc - tic)
 
 		for i in range(opts.test_batch_size):
-			result = tensor2im(result_batch[i])
+
 			im_path = dataset.paths[global_i]
+			im_save_path = os.path.join(out_path_results, os.path.basename(im_path))
+
+			if opts.save_latents:
+				result_batch, result_latents = result_batch
+				result_latent = result_latents[i].unsqueeze(dim=0)
+				latent_save_path = Path(im_save_path).with_suffix('.pickle')
+				with latent_save_path.open('wb') as fp:
+					pickle.dump(result_latent, fp)
+
+			result = tensor2im(result_batch[i])
 
 			if opts.couple_outputs or global_i % 100 == 0:
 				input_im = log_input_image(input_batch[i], opts)
@@ -93,9 +118,7 @@ def run():
 										  np.array(result.resize(resize_amount))], axis=1)
 				Image.fromarray(res).save(os.path.join(out_path_coupled, os.path.basename(im_path)))
 
-			im_save_path = os.path.join(out_path_results, os.path.basename(im_path))
 			Image.fromarray(np.array(result)).save(im_save_path)
-
 			global_i += 1
 
 	stats_path = os.path.join(opts.exp_dir, 'stats.txt')
@@ -108,7 +131,7 @@ def run():
 
 def run_on_batch(inputs, net, opts):
 	if opts.latent_mask is None:
-		result_batch = net(inputs, randomize_noise=False, resize=opts.resize_outputs)
+		result_batch = net(inputs, return_latents=opts.save_latents, randomize_noise=False, resize=opts.resize_outputs)
 	else:
 		latent_mask = [int(l) for l in opts.latent_mask.split(",")]
 		result_batch = []
